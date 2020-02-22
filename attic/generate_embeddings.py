@@ -13,6 +13,7 @@ hp_to_mp_bestmatch_url = 'https://github.com/obophenotype/upheno/blob/master/map
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(BASE_DIR, 'data')
 
+# do the naive experiment here
 
 def owl2edge(owl_iri: str, data_dir: str) -> bool:
     a = urlparse(owl_iri)
