@@ -1,1 +1,1 @@
-git+git://github.com/monarch-initiative/N2V.git@master#egg=n2v
+git+git://github.com/justaddcoffee/N2V.git@phenotype_matching#egg=n2v
