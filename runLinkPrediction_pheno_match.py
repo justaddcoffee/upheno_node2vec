@@ -39,8 +39,8 @@ def parse_args():
     parser.add_argument('--walk-length', type=int, default=80,
                         help='Length of walk per source. Default is 80.')
 
-    parser.add_argument('--num-walks', type=int, default=10,
-                        help='Number of walks per source. Default is 10.')
+    parser.add_argument('--num-walks', type=int, default=80,
+                        help='Number of walks per source. Default is 80.')
 
     parser.add_argument('--window-size', type=int, default=10,
                         help='Context size for optimization. Default is 10.')
@@ -137,6 +137,8 @@ def main(args):
     :return: Result of link prediction
     """
     print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(args.p,args.q,args.classifier, args.useGamma,args.w2v_model))
+
+    make_phenotype_train_test_data()
     pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = read_graphs()
     pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph,  args.p, args.q, args.gamma, args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
