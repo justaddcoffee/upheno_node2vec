@@ -1,19 +1,39 @@
 all: data
 
-data: data/hp-to-mp-bestmatches.tsv data/hp.nt data/mp.nt
+data: data/hp-to-mp-bestmatches.edges data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges data/all.edges
 
-data/hp-to-mp-bestmatches.tsv:
-	mkdir data
-	wget https://github.com/obophenotype/upheno/blob/master/mappings/hp-to-mp-bestmatches.tsv?raw=true -O data/hp-to-mp-bestmatches.tsv
+data/hp-to-mp-bestmatches.edges:
+	mkdir -p data
+	wget 'https://github.com/obophenotype/upheno/blob/master/mappings/hp-to-mp-bestmatches.tsv?raw=true' -O data/hp-to-mp-bestmatches.tsv
+	cut -f1,3,5 data/hp-to-mp-bestmatches.tsv > data/hp-to-mp-bestmatches.edges
 
-data/hp.owl:
+data/hp.edges:
 	wget http://purl.obolibrary.org/obo/hp.owl -O data/hp.owl
+	rapper -o ntriples data/hp.owl | cut -f1,3 -d " " > data/hp.edges
 
-data/mp.owl:
+data/mp.edges:
 	wget http://www.informatics.jax.org/downloads/reports/mp.owl -O data/mp.owl
+	rapper -o ntriples data/mp.owl | cut -f1,3 -d " " > data/mp.edges
 
-data/hp.nt: data/hp.owl
-	rapper -o ntriples data/hp.owl > data/hp.nt
+data/upheno_root.edges:
+	wget https://raw.githubusercontent.com/obophenotype/upheno/master/upheno_root_alignments.owl -O data/upheno_root.owl
+	grep SubClassOf data/upheno_root.owl | perl -p -e 's/SubClassOf\(//' | perl -p -e 's/\)//' >> data/upheno_root.edges
 
-data/mp.nt: data/mp.owl
-	rapper -o ntriples data/mp.owl > data/mp.nt
+data/go.edges:
+	wget http://purl.obolibrary.org/obo/upheno/imports/go_phenotype.owl -O data/go.owl
+	rapper -o ntriples data/go.owl | cut -f1,3 -d " " > data/go.edges
+
+data/mpath.edges:
+	wget http://purl.obolibrary.org/obo/upheno/imports/mpath_phenotype.owl -O data/mpath.owl
+	rapper -o ntriples data/mpath.owl | cut -f1,3 -d " " > data/mpath.edges
+
+data/nbo.edges:
+	wget http://purl.obolibrary.org/obo/upheno/imports/nbo_phenotype.owl -O data/nbo.owl
+	rapper -o ntriples data/nbo.owl | cut -f1,3 -d " " > data/nbo.edges
+
+data/uberon.edges:
+	wget http://purl.obolibrary.org/obo/upheno/imports/uberon_phenotype.owl -O data/uberon.owl
+	rapper -o ntriples data/uberon.owl | cut -f1,3 -d " " > data/uberon.edges
+
+data/all.edges: data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges
+	cat data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges > data/all.edges
