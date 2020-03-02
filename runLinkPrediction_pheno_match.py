@@ -1,4 +1,6 @@
 import argparse
+import os
+
 from xn2v import CSFGraph
 from xn2v.word2vec import SkipGramWord2Vec
 from xn2v.word2vec import ContinuousBagOfWordsWord2Vec
@@ -8,23 +10,15 @@ import sys
 
 # Adapted from Vida's code to predict PPI links
 
+
 def parse_args():
     '''
     Parses arguments.
     '''
     parser = argparse.ArgumentParser(description="Run link Prediction.")
 
-    parser.add_argument('--pos_train', nargs='?', default='tests/data/ppismall/pos_train_edges',
-                        help='Input positive training edges path')
-
-    parser.add_argument('--pos_test', nargs='?', default='tests/data/ppismall/pos_test_edges',
-                        help='Input positive test edges path')
-
-    parser.add_argument('--neg_train', nargs='?', default='tests/data/ppismall/neg_train_edges',
-                        help='Input negative training edges path')
-
-    parser.add_argument('--neg_test', nargs='?', default='tests/data/ppismall/neg_test_edges',
-                        help='Input negative test edges path')
+    parser.add_argument('--nt_file', type=argparse.FileType('r'),
+                        help='Path to file(s) with triples to read into graph')
 
     parser.add_argument('--embed_graph', nargs='?', default='embedded_graph.embedded',
                         help='Embeddings path of the positive training graph')
@@ -98,6 +92,7 @@ def learn_embeddings(walks, pos_train_graph, w2v_model):
 
     model.write_embeddings(args.embed_graph)
 
+
 def linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph):
     """
     :param pos_train_graph: positive training graph
@@ -114,13 +109,20 @@ def linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph):
     lp.output_classifier_results()
     lp.output_edge_node_information()
 
-def read_graphs():
+
+def make_phenotype_train_test_data(edge_file,
+                                   out_file_dir="data",
+                                   limit=100):
     """
-    Reads pos_train, pos_test, neg_train and neg_test edges with CSFGraph
+    Reads edge files, make pos_train, pos_test, neg_train and neg_test data
     :return: pos_train, pos_test, neg_train and neg_test graphs in CSFGraph format
     """
 
-    pos_train_graph = CSFGraph(args.pos_train)
+    # make pos_graph from edge file
+    pos_train_graph = CSFGraph(edge_file.name)
+
+    sys.exit("done")
+
     pos_test_graph = CSFGraph(args.pos_test)
     neg_train_graph = CSFGraph(args.neg_train)
     neg_test_graph = CSFGraph(args. neg_test)
@@ -138,8 +140,7 @@ def main(args):
     """
     print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(args.p,args.q,args.classifier, args.useGamma,args.w2v_model))
 
-    make_phenotype_train_test_data()
-    pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = read_graphs()
+    pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = make_phenotype_train_test_data(args.nt_file)
     pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph,  args.p, args.q, args.gamma, args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
     learn_embeddings(walks, pos_train_graph,args.w2v_model)
