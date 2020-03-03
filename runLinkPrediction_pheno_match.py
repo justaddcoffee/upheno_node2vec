@@ -6,6 +6,7 @@ import re
 
 import numpy
 import yaml
+from tqdm import tqdm
 from xn2v import CSFGraph
 from xn2v.word2vec import SkipGramWord2Vec
 from xn2v.word2vec import ContinuousBagOfWordsWord2Vec
@@ -213,27 +214,46 @@ def make_phenotype_train_test_data(upheno_graph,
 
                 pos_train_append_fh.write("\t".join([item1, item2, "1"]) + "\n")
 
-    logging.info("Loading CSFGraphs for positive train and positive test edges...")
+    logging.info("Loading CSFGraphs from positive train and positive test edge files...")
     pos_train_graph = CSFGraph(pos_train)
     pos_test_graph = CSFGraph(pos_test)
 
     # make negative edges
-    logging.info("Making negative train and negative test files...")
-    neg_train_edges = 0
-    with open(neg_train, 'w') as neg_train_fh:
-        while neg_train_edges < pos_train_graph.edge_count():
-            node1_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
-            node2_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
-            if not pos_train_graph.has_edge(node1_name, node2_name) and \
-               not pos_test_graph.has_edge(node1_name, node2_name):
-                neg_train_edges = neg_train_edges + 1
-                neg_train_fh.write("\t".join([node1_name, node2_name]) + "\n")
+    logging.info("Making negative train file...")
+    make_negative_edge_file(neg_train,
+                            pos_train_graph.edge_count(),
+                            pos_train_graph, pos_test_graph)
 
+    logging.info("Making negative test file...")
+    make_negative_edge_file(neg_test,
+                            pos_test_graph.edge_count(),
+                            pos_train_graph, pos_test_graph)
+
+    logging.info("Loading CSFGraphs from negative train and test edge file...")
     neg_train_graph = CSFGraph(neg_train)
-    sys.exit("done")
-
     neg_test_graph = CSFGraph(neg_test)
     return pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph
+
+
+def make_negative_edge_file(filename: str,
+                            num_edges_to_make: int,
+                            pos_train_graph: CSFGraph,
+                            pos_test_graph: CSFGraph) -> bool:
+    edge_count = 0
+    with open(filename, 'w') as neg_train_fh,\
+            tqdm(total=pos_train_graph.edge_count()) as pbar:
+        while edge_count < num_edges_to_make:
+            node1_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
+            node2_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
+
+            if edge_count % 100 == 0:
+                pbar.update(100)
+
+            if not pos_train_graph.has_edge(node1_name, node2_name) and \
+               not pos_test_graph.has_edge(node1_name, node2_name):
+                neg_train_fh.write("\t".join([node1_name, node2_name]) + "\n")
+                edge_count = edge_count + 1
+    return True
 
 
 def random_node(graph: CSFGraph) -> int:
