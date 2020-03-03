@@ -16,6 +16,7 @@ import sys
 
 regex = re.compile("<(.*[_|:])(.*)>")
 
+
 def parse_args():
     '''
     Parses arguments.
