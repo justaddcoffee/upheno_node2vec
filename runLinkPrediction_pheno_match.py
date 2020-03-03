@@ -28,6 +28,9 @@ def parse_args():
     parser.add_argument('--equivalent_phenotypes', type=argparse.FileType('r'),
                         help='Path to file with edges/weights for equivalent phenotypes')
 
+    parser.add_argument('--weight_multiplier', type=int, default=10,
+                        help='Factor to multiply weight of phenotype edges to bias random walk')
+
     parser.add_argument('--embed_graph', nargs='?', default='embedded_graph.embedded',
                         help='Embeddings path of the positive training graph')
 
@@ -136,6 +139,7 @@ def curieize(item, curie_map):
 
 def make_phenotype_train_test_data(upheno_graph,
                                    equiv_phenotypes,
+                                   weight_multiplier,
                                    test_fraction=0.2,
                                    out_file_dir="data"):
     """
@@ -149,6 +153,7 @@ def make_phenotype_train_test_data(upheno_graph,
     :param upheno_graph file containing all edges from upheno (except equivalent
     phenotypes)
     :param equiv_phenotypes file containing equivalent phenotype edges, with weights
+    :param weight_multiplier factor to multiply weight of phenotype links
     :param test_fraction=0.2 what fraction of equiv_phenotypes should be used for
     testing
     :param out_file_dir="data" where should we write stuff out
@@ -167,15 +172,18 @@ def make_phenotype_train_test_data(upheno_graph,
     # write out pos_train and pos_test
     # first split equiv phenotype edges into train/test and write out positives edges
     logging.info("Writing out positive train and positive test files...")
-    with open(equiv_phenotypes.name, 'rb') as equiv_fh, \
-            open(pos_train, 'wb') as pos_train_fh, \
-            open(pos_test, 'wb') as pos_test_fh:
+    with open(equiv_phenotypes.name, 'r') as equiv_fh, \
+            open(pos_train, 'w') as pos_train_fh, \
+            open(pos_test, 'w') as pos_test_fh:
         for line in equiv_fh:
             r = random.random()
+            items = line.rstrip().split("\t")
+            items[2] = str(float(items[2]) * weight_multiplier)
+            outline = "\t".join(items) + "\n"
             if r > test_fraction:
-                pos_train_fh.write(line)
+                pos_train_fh.write(outline)
             else:
-                pos_test_fh.write(line)
+                pos_test_fh.write(outline)
         equiv_fh.close()
         pos_train_fh.close()
         pos_test_fh.close()
@@ -188,12 +196,13 @@ def make_phenotype_train_test_data(upheno_graph,
                 item1 = curieize(item1, curie_map)
                 item2 = curieize(item2, curie_map)
 
-                pos_train_append_fh.write("\t".join([item1, item2]) + "\n")
-
-    sys.exit("done")
+                pos_train_append_fh.write("\t".join([item1, item2, "1"]) + "\n")
 
     pos_train_graph = CSFGraph(pos_train)
     pos_test_graph = CSFGraph(pos_test)
+
+    sys.exit("stopping at neg train/test")
+
     neg_train_graph = CSFGraph(neg_train)
     neg_test_graph = CSFGraph(neg_test)
     return pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph
@@ -211,8 +220,9 @@ def main(args):
     print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(args.p,args.q,args.classifier, args.useGamma,args.w2v_model))
 
     pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = \
-        make_phenotype_train_test_data(args.upheno_graph,
-                                       args.equivalent_phenotypes)
+        make_phenotype_train_test_data(upheno_graph=args.upheno_graph,
+                                       equiv_phenotypes=args.equivalent_phenotypes,
+                                       weight_multiplier=args.weight_multiplier)
     pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph,  args.p, args.q, args.gamma, args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
     learn_embeddings(walks, pos_train_graph,args.w2v_model)
