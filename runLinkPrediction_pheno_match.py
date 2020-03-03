@@ -25,6 +25,10 @@ def parse_args():
     '''
     parser = argparse.ArgumentParser(description="Run link Prediction.")
 
+    parser.add_argument('--make_edge_files', dest='make_edge_files', action='store_true')
+    parser.add_argument('--dont_make_edge_files', dest='make_edge_files', action='store_false')
+    parser.set_defaults(make_edge_files=True)
+
     parser.add_argument('--upheno_graph', type=argparse.FileType('r'),
                         help='Path to file with all edges in upheno graph')
 
@@ -145,11 +149,14 @@ def curieize(item, curie_map):
         return item
 
 
-def make_phenotype_train_test_data(upheno_graph,
-                                   equiv_phenotypes,
-                                   weight_multiplier,
-                                   test_fraction=0.2,
-                                   out_file_dir="data"):
+def make_train_test_files(upheno_graph,
+                          equiv_phenotypes,
+                          weight_multiplier: int,
+                          pos_train: str,
+                          pos_test: str,
+                          neg_train: str,
+                          neg_test: str,
+                          test_fraction: float = 0.2):
     """
     Read in equivalent phenotypes, split them into train/test (using test_fraction),
     then write out:
@@ -162,24 +169,21 @@ def make_phenotype_train_test_data(upheno_graph,
     phenotypes)
     :param equiv_phenotypes file containing equivalent phenotype edges, with weights
     :param weight_multiplier factor to multiply weight of phenotype links
+    :param pos_train: filename write out pos train edges
+    :param pos_test: filename to write out pos test edges
+    :param neg_train: filename to write neg train edges
+    :param neg_test: filename to write neg test edges
     :param test_fraction=0.2 what fraction of equiv_phenotypes should be used for
     testing
-    :param out_file_dir="data" where should we write stuff out
 
     :return: pos_train, pos_test, neg_train and neg_test graphs in CSFGraph format
     """
 
     curie_map = make_iri_to_curie_map()
 
-    pos_train = os.path.join(out_file_dir, "pos_train.edges")
-    pos_test = os.path.join(out_file_dir, "pos_test.edges")
-
-    neg_train = os.path.join(out_file_dir, "neg_train.edges")
-    neg_test = os.path.join(out_file_dir, "neg_test.edges")
-
     # write out pos_train and pos_test
     # first split equiv phenotype edges into train/test and write out positives edges
-    logging.info("Making positive train and positive test files...")
+    logging.info("Making positive train and positive test files")
     with open(equiv_phenotypes.name, 'r') as equiv_fh, \
             open(pos_train, 'w') as pos_train_fh, \
             open(pos_test, 'w') as pos_test_fh:
@@ -214,25 +218,23 @@ def make_phenotype_train_test_data(upheno_graph,
 
                 pos_train_append_fh.write("\t".join([item1, item2, "1"]) + "\n")
 
-    logging.info("Loading CSFGraphs from positive train and positive test edge files...")
+    logging.info("Loading CSFGraphs from positive train and positive test edge files")
     pos_train_graph = CSFGraph(pos_train)
     pos_test_graph = CSFGraph(pos_test)
 
     # make negative edges
-    logging.info("Making negative train file...")
+    logging.info("Making negative training edges file")
     make_negative_edge_file(neg_train,
                             pos_train_graph.edge_count(),
                             pos_train_graph, pos_test_graph)
 
-    logging.info("Making negative test file...")
+    logging.info("Making negative test edges file")
     make_negative_edge_file(neg_test,
                             pos_test_graph.edge_count(),
                             pos_train_graph, pos_test_graph)
 
-    logging.info("Loading CSFGraphs from negative train and test edge file...")
-    neg_train_graph = CSFGraph(neg_train)
-    neg_test_graph = CSFGraph(neg_test)
-    return pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph
+    logging.info("Loading CSFGraphs from negative train and test edge file")
+    return True
 
 
 def make_negative_edge_file(filename: str,
@@ -246,12 +248,12 @@ def make_negative_edge_file(filename: str,
             node1_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
             node2_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
 
-            if edge_count % 100 == 0:
+            if edge_count % 10 == 0:
                 pbar.update(100)
 
             if not pos_train_graph.has_edge(node1_name, node2_name) and \
                not pos_test_graph.has_edge(node1_name, node2_name):
-                neg_train_fh.write("\t".join([node1_name, node2_name]) + "\n")
+                neg_train_fh.write("\t".join([node1_name, node2_name, "1"]) + "\n")
                 edge_count = edge_count + 1
     return True
 
@@ -272,10 +274,28 @@ def main(args):
     print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(
         args.p, args.q, args.classifier, args.useGamma, args.w2v_model))
 
-    pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = \
-        make_phenotype_train_test_data(upheno_graph=args.upheno_graph,
-                                       equiv_phenotypes=args.equivalent_phenotypes,
-                                       weight_multiplier=args.weight_multiplier)
+    pos_train = os.path.join("data/pos_train.edges")
+    pos_test = os.path.join("data/pos_test.edges")
+    neg_train = os.path.join("data/neg_train.edges")
+    neg_test = os.path.join("data/neg_test.edges")
+
+    if args.make_edge_files:
+        logging.info("Remaking edge files")
+        make_train_test_files(upheno_graph=args.upheno_graph,
+                              equiv_phenotypes=args.equivalent_phenotypes,
+                              weight_multiplier=args.weight_multiplier,
+                              pos_train=pos_train,
+                              pos_test=pos_test,
+                              neg_train=neg_train,
+                              neg_test=neg_test)
+    else:
+        logging.info("Using existing edge files")
+
+    pos_train_graph = CSFGraph(pos_train)
+    pos_test_graph = CSFGraph(pos_test)
+    neg_train_graph = CSFGraph(neg_train)
+    neg_test_graph = CSFGraph(neg_test)
+
     pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph, args.p, args.q, args.gamma,
                                             args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
