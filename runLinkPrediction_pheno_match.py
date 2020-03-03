@@ -68,7 +68,7 @@ def parse_args():
 
     parser.add_argument('--useGamma', dest='useGamma', action='store_true', help="True if the graph is heterogeneous, "
                                                                                   "False if the graph is homogeneous.")
-    parser.set_defaults(useGamma=False)
+    parser.set_defaults(useGamma=True)
     parser.add_argument('--classifier', nargs='?', default='RF',
                         help="Binary classifier for link prediction, it should be either LR, RF or SVM")
 
@@ -192,11 +192,15 @@ def make_phenotype_train_test_data(upheno_graph,
         with open(pos_train, 'a') as pos_train_append_fh, \
                 open(upheno_graph.name, 'r') as upheno_graph_fh:
             for line in upheno_graph_fh:
+
+                # turn <IRI:1234> into CURIE:1234
                 (item1, item2) = line.strip().split(" ")
                 item1 = curieize(item1, curie_map)
                 item2 = curieize(item2, curie_map)
 
                 pos_train_append_fh.write("\t".join([item1, item2, "1"]) + "\n")
+
+    # make negative edges
 
     pos_train_graph = CSFGraph(pos_train)
     pos_test_graph = CSFGraph(pos_test)
