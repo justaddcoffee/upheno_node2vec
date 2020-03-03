@@ -14,6 +14,7 @@ import sys
 
 # Adapted from Vida's code to predict PPI links
 
+regex = re.compile("<(.*[_|:])(.*)>")
 
 def parse_args():
     '''
@@ -124,9 +125,9 @@ def make_iri_to_curie_map() -> dict:
 
 
 def curieize(item, curie_map):
-    regex = "<(.*[_|:])(.*)>"
-    curie_prefix = re.sub(regex, r'\1', item)
-    id = re.sub(regex, r'\2', item)
+    curie_prefix = regex.sub(r'\1', item)
+    id = regex.sub(r'\2', item)
+
     if curie_prefix in curie_map:
         return curie_map[curie_prefix] + ":" + id
     else:
