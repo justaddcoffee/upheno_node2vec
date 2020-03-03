@@ -4,6 +4,7 @@ import os
 import random
 import re
 
+import numpy
 import yaml
 from xn2v import CSFGraph
 from xn2v.word2vec import SkipGramWord2Vec
@@ -67,8 +68,9 @@ def parse_args():
                         help='hyperparameter for jumping from one network to another network '
                              'in heterogeneous graphs. Default is 1.')
 
-    parser.add_argument('--useGamma', dest='useGamma', action='store_true', help="True if the graph is heterogeneous, "
-                                                                                  "False if the graph is homogeneous.")
+    parser.add_argument('--useGamma', dest='useGamma', action='store_true',
+                        help="True if the graph is heterogeneous, "
+                             "False if the graph is homogeneous.")
     parser.set_defaults(useGamma=True)
     parser.add_argument('--classifier', nargs='?', default='RF',
                         help="Binary classifier for link prediction, it should be either LR, RF or SVM")
@@ -92,10 +94,12 @@ def learn_embeddings(walks, pos_train_graph, w2v_model):
 
     if w2v_model == "Skipgram":
         model = SkipGramWord2Vec(walks, worddictionary=worddictionary,
-                             reverse_worddictionary=reverse_worddictionary, num_steps=100)
+                                 reverse_worddictionary=reverse_worddictionary,
+                                 num_steps=100)
     elif w2v_model == "CBOW":
         model = ContinuousBagOfWordsWord2Vec(walks, worddictionary=worddictionary,
-                                 reverse_worddictionary=reverse_worddictionary, num_steps=100)
+                                             reverse_worddictionary=reverse_worddictionary,
+                                             num_steps=100)
     else:
         print("[ERROR] enter Skipgram or CBOW")
         sys.exit(1)
@@ -113,8 +117,10 @@ def linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph):
     :param neg_test_graph: negative test graph
     :return: Metrics of logistic regression as the results of link prediction
     """
-    lp = LinkPrediction(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph,
-                        args.embed_graph, args.edge_embed_method, args.classifier, args.type)
+    lp = LinkPrediction(pos_train_graph, pos_test_graph, neg_train_graph,
+                        neg_test_graph,
+                        args.embed_graph, args.edge_embed_method, args.classifier,
+                        args.type)
 
     lp.prepare_lables_test_training()
     lp.predict_links()
@@ -172,7 +178,7 @@ def make_phenotype_train_test_data(upheno_graph,
 
     # write out pos_train and pos_test
     # first split equiv phenotype edges into train/test and write out positives edges
-    logging.info("Writing out positive train and positive test files...")
+    logging.info("Making positive train and positive test files...")
     with open(equiv_phenotypes.name, 'r') as equiv_fh, \
             open(pos_train, 'w') as pos_train_fh, \
             open(pos_test, 'w') as pos_test_fh:
@@ -200,7 +206,6 @@ def make_phenotype_train_test_data(upheno_graph,
         with open(pos_train, 'a') as pos_train_append_fh, \
                 open(upheno_graph.name, 'r') as upheno_graph_fh:
             for line in upheno_graph_fh:
-
                 # turn <IRI:1234> into CURIE:1234
                 (item1, item2) = line.strip().split(" ")
                 item1 = curieize(item1, curie_map)
@@ -208,16 +213,31 @@ def make_phenotype_train_test_data(upheno_graph,
 
                 pos_train_append_fh.write("\t".join([item1, item2, "1"]) + "\n")
 
-    # make negative edges
-
+    logging.info("Loading CSFGraphs for positive train and positive test edges...")
     pos_train_graph = CSFGraph(pos_train)
     pos_test_graph = CSFGraph(pos_test)
 
-    sys.exit("stopping at neg train/test")
+    # make negative edges
+    logging.info("Making negative train and negative test files...")
+    neg_train_edges = 0
+    with open(neg_train, 'w') as neg_train_fh:
+        while neg_train_edges < pos_train_graph.edge_count():
+            node1_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
+            node2_name = pos_train_graph.index_to_node_map[random_node(pos_train_graph)]
+            if not pos_train_graph.has_edge(node1_name, node2_name) and \
+               not pos_test_graph.has_edge(node1_name, node2_name):
+                neg_train_edges = neg_train_edges + 1
+                neg_train_fh.write("\t".join([node1_name, node2_name]) + "\n")
 
     neg_train_graph = CSFGraph(neg_train)
+    sys.exit("done")
+
     neg_test_graph = CSFGraph(neg_test)
     return pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph
+
+
+def random_node(graph: CSFGraph) -> int:
+    return int(numpy.random.uniform(0, graph.node_count(), 1))
 
 
 def main(args):
@@ -229,15 +249,17 @@ def main(args):
     :param args: parameters of node2vec and link prediction
     :return: Result of link prediction
     """
-    print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(args.p,args.q,args.classifier, args.useGamma,args.w2v_model))
+    print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(
+        args.p, args.q, args.classifier, args.useGamma, args.w2v_model))
 
     pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = \
         make_phenotype_train_test_data(upheno_graph=args.upheno_graph,
                                        equiv_phenotypes=args.equivalent_phenotypes,
                                        weight_multiplier=args.weight_multiplier)
-    pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph,  args.p, args.q, args.gamma, args.useGamma)
+    pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph, args.p, args.q, args.gamma,
+                                            args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
-    learn_embeddings(walks, pos_train_graph,args.w2v_model)
+    learn_embeddings(walks, pos_train_graph, args.w2v_model)
     linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph)
 
 
