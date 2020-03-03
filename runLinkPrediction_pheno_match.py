@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument('--equivalent_phenotypes', type=argparse.FileType('r'),
                         help='Path to file with edges/weights for equivalent phenotypes')
 
-    parser.add_argument('--weight_multiplier', type=int, default=10,
+    parser.add_argument('--weight_multiplier', type=int, default=1,
                         help='Factor to multiply weight of phenotype edges to bias random walk')
 
     parser.add_argument('--embed_graph', nargs='?', default='embedded_graph.embedded',
