@@ -179,7 +179,14 @@ def make_phenotype_train_test_data(upheno_graph,
         for line in equiv_fh:
             r = random.random()
             items = line.rstrip().split("\t")
+            items[0] = curieize(items[0], curie_map)
+            items[1] = curieize(items[1], curie_map)
+
+            # default edge weight for known equivalent phenotypes
+            if len(items) < 3:
+                items.append("1")
             items[2] = str(float(items[2]) * weight_multiplier)
+
             outline = "\t".join(items) + "\n"
             if r > test_fraction:
                 pos_train_fh.write(outline)
