@@ -1,5 +1,7 @@
 import argparse
+import logging
 import os
+import random
 
 from xn2v import CSFGraph
 from xn2v.word2vec import SkipGramWord2Vec
@@ -17,8 +19,11 @@ def parse_args():
     '''
     parser = argparse.ArgumentParser(description="Run link Prediction.")
 
-    parser.add_argument('--nt_file', type=argparse.FileType('r'),
-                        help='Path to file(s) with triples to read into graph')
+    parser.add_argument('--upheno_graph', type=argparse.FileType('r'),
+                        help='Path to file with all edges in upheno graph')
+
+    parser.add_argument('--equivalent_phenotypes', type=argparse.FileType('r'),
+                        help='Path to file with edges/weights for equivalent phenotypes')
 
     parser.add_argument('--embed_graph', nargs='?', default='embedded_graph.embedded',
                         help='Embeddings path of the positive training graph')
@@ -110,22 +115,62 @@ def linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph):
     lp.output_edge_node_information()
 
 
-def make_phenotype_train_test_data(edge_file,
-                                   out_file_dir="data",
-                                   limit=100):
+def make_phenotype_train_test_data(upheno_graph,
+                                   equiv_phenotypes,
+                                   test_fraction=0.2,
+                                   out_file_dir="data"):
     """
-    Reads edge files, make pos_train, pos_test, neg_train and neg_test data
+    Read in equivalent phenotypes, split them into train/test (using test_fraction),
+    then write out:
+    pos_train (upheno_graph + train equivalent phenotypes)
+    pos_test (test equivalent phenotypes)
+    neg_train (random edges connecting nodes not connected in upheno_graph)
+    neg_test (random edges connecting nodes not connected in equiv_phenotypes)
+
+    :param upheno_graph file containing all edges from upheno (except equivalent
+    phenotypes)
+    :param equiv_phenotypes file containing equivalent phenotype edges, with weights
+    :param test_fraction=0.2 what fraction of equiv_phenotypes should be used for
+    testing
+    :param out_file_dir="data" where should we write stuff out
+
     :return: pos_train, pos_test, neg_train and neg_test graphs in CSFGraph format
     """
 
-    # make pos_graph from edge file
-    pos_train_graph = CSFGraph(edge_file.name)
+    pos_train = os.path.join(out_file_dir, "pos_train.edges")
+    pos_test = os.path.join(out_file_dir, "pos_test.edges")
+
+    neg_train = os.path.join(out_file_dir, "neg_train.edges")
+    neg_test = os.path.join(out_file_dir, "neg_test.edges")
+
+    # write out pos_train and pos_test
+    # first split equiv phenotype edges into train/test and write out positives edges
+    logging.info("Writing out positive train and positive test files...")
+    with open(equiv_phenotypes.name, 'rb') as equiv_fh, \
+            open(pos_train, 'wb') as pos_train_fh, \
+            open(pos_test, 'wb') as pos_test_fh:
+        for line in equiv_fh:
+            r = random.random()
+            if r > test_fraction:
+                pos_train_fh.write(line)
+            else:
+                pos_test_fh.write(line)
+        equiv_fh.close()
+        pos_train_fh.close()
+        pos_test_fh.close()
+
+        # append upheno graph to pos_train edges:
+        with open(pos_train, 'ab') as pos_train_append_fh, \
+                open(upheno_graph.name, 'rb') as upheno_graph_fh:
+            for line in upheno_graph_fh:
+                pos_train_append_fh.write(line)
 
     sys.exit("done")
 
-    pos_test_graph = CSFGraph(args.pos_test)
-    neg_train_graph = CSFGraph(args.neg_train)
-    neg_test_graph = CSFGraph(args. neg_test)
+    pos_train_graph = CSFGraph(pos_train)
+    pos_test_graph = CSFGraph(pos_test)
+    neg_train_graph = CSFGraph(neg_train)
+    neg_test_graph = CSFGraph(neg_test)
     return pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph
 
 
@@ -140,7 +185,9 @@ def main(args):
     """
     print("[INFO]: p={}, q={}, classifier= {}, useGamma={}, word2vec_model={}".format(args.p,args.q,args.classifier, args.useGamma,args.w2v_model))
 
-    pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = make_phenotype_train_test_data(args.nt_file)
+    pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph = \
+        make_phenotype_train_test_data(args.upheno_graph,
+                                       args.equivalent_phenotypes)
     pos_train_g = xn2v.hetnode2vec.N2vGraph(pos_train_graph,  args.p, args.q, args.gamma, args.useGamma)
     walks = pos_train_g.simulate_walks(args.num_walks, args.walk_length)
     learn_embeddings(walks, pos_train_graph,args.w2v_model)
