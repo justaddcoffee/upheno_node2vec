@@ -1,6 +1,8 @@
 all: data
 
-data: data/hp-to-mp-bestmatches.edges data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges data/all.edges
+data: data/hp-to-mp-bestmatches.edges data/hp.edges data/mp.edges \
+data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges \
+data/all.edges data/curie_map.yaml
 
 data/hp-to-mp-bestmatches.edges:
 	mkdir -p data
@@ -37,3 +39,6 @@ data/uberon.edges:
 
 data/all.edges: data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges
 	cat data/hp.edges data/mp.edges data/upheno_root.edges data/go.edges data/mpath.edges data/nbo.edges data/uberon.edges > data/all.edges
+
+data/curie_map.yaml:
+	wget https://raw.githubusercontent.com/monarch-initiative/dipper/master/dipper/curie_map.yaml -O data/curie_map.yaml

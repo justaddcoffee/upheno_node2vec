@@ -2,7 +2,9 @@ import argparse
 import logging
 import os
 import random
+import re
 
+import yaml
 from xn2v import CSFGraph
 from xn2v.word2vec import SkipGramWord2Vec
 from xn2v.word2vec import ContinuousBagOfWordsWord2Vec
@@ -115,6 +117,22 @@ def linkpred(pos_train_graph, pos_test_graph, neg_train_graph, neg_test_graph):
     lp.output_edge_node_information()
 
 
+def make_iri_to_curie_map() -> dict:
+    with open(os.path.join('data', 'curie_map.yaml')) as yaml_file:
+        curie_map = yaml.safe_load(yaml_file)
+    return {v: k for k, v in curie_map.items()}
+
+
+def curieize(item, curie_map):
+    regex = "<(.*[_|:])(.*)>"
+    curie_prefix = re.sub(regex, r'\1', item)
+    id = re.sub(regex, r'\2', item)
+    if curie_prefix in curie_map:
+        return curie_map[curie_prefix] + ":" + id
+    else:
+        return item
+
+
 def make_phenotype_train_test_data(upheno_graph,
                                    equiv_phenotypes,
                                    test_fraction=0.2,
@@ -136,6 +154,8 @@ def make_phenotype_train_test_data(upheno_graph,
 
     :return: pos_train, pos_test, neg_train and neg_test graphs in CSFGraph format
     """
+
+    curie_map = make_iri_to_curie_map()
 
     pos_train = os.path.join(out_file_dir, "pos_train.edges")
     pos_test = os.path.join(out_file_dir, "pos_test.edges")
@@ -160,10 +180,14 @@ def make_phenotype_train_test_data(upheno_graph,
         pos_test_fh.close()
 
         # append upheno graph to pos_train edges:
-        with open(pos_train, 'ab') as pos_train_append_fh, \
-                open(upheno_graph.name, 'rb') as upheno_graph_fh:
+        with open(pos_train, 'a') as pos_train_append_fh, \
+                open(upheno_graph.name, 'r') as upheno_graph_fh:
             for line in upheno_graph_fh:
-                pos_train_append_fh.write(line)
+                (item1, item2) = line.strip().split(" ")
+                item1 = curieize(item1, curie_map)
+                item2 = curieize(item2, curie_map)
+
+                pos_train_append_fh.write("\t".join([item1, item2]) + "\n")
 
     sys.exit("done")
 
