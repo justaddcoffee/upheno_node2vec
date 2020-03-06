@@ -76,6 +76,9 @@ def parse_args():
     parser.add_argument('--useGamma', dest='useGamma', action='store_true',
                         help="True if the graph is heterogeneous, "
                              "False if the graph is homogeneous.")
+    parser.add_argument('--dontUseGamma', dest='useGamma', action='store_false',
+                        help="True if the graph is heterogeneous, "
+                             "False if the graph is homogeneous.")
     parser.set_defaults(useGamma=True)
     parser.add_argument('--classifier', nargs='?', default='RF',
                         help="Binary classifier for link prediction, it should be either LR, RF or SVM")
